@@ -3,8 +3,8 @@
 [![Build Status](https://img.shields.io/travis/locustio/locust.svg)](https://travis-ci.org/locustio/locust)
 [![codecov](https://codecov.io/gh/locustio/locust/branch/master/graph/badge.svg)](https://codecov.io/gh/locustio/locust)
 [![license](https://img.shields.io/github/license/locustio/locust.svg)](https://github.com/locustio/locust/blob/master/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/locustio.svg)](https://pypi.python.org/pypi/locustio)
-[![PyPI](https://img.shields.io/pypi/pyversions/locustio.svg)](https://pypi.python.org/pypi/locustio)
+[![PyPI](https://img.shields.io/pypi/v/locustio.svg)](https://pypi.org/project/locustio/)
+[![PyPI](https://img.shields.io/pypi/pyversions/locustio.svg)](https://pypi.org/project/locustio/)
 [![GitHub contributors](https://img.shields.io/github/contributors/locustio/locust.svg)](https://github.com/locustio/locust/graphs/contributors)
 
 ## Links
@@ -56,7 +56,7 @@ More info and documentation can be found at: <a href="https://docs.locust.io/">h
 
 For questions about how to use Locust, feel free to stop by the Slack or ask questions on Stack Overflow tagged Locust.
 
-## Bug reporting or feature requests
+## Bug reporting
 
 Open a Github issue and follow the template listed there.
 
@@ -74,4 +74,4 @@ Open source licensed under the MIT license (see _LICENSE_ file for details).
 
 ## Supported Python Versions
 
-Locust supports Python 2.7, 3.4, 3.5, and 3.6.
+Locust is supported on Python 2.7, 3.5, 3.6, 3.7, 3.8.

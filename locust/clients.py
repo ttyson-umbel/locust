@@ -90,7 +90,7 @@ class HttpSession(requests.Session):
         :param cookies: (optional) Dict or CookieJar object to send with the :class:`Request`.
         :param files: (optional) Dictionary of ``'filename': file-like-objects`` for multipart encoding upload.
         :param auth: (optional) Auth tuple or callable to enable Basic/Digest/Custom HTTP Auth.
-        :param timeout: (optional) How long to wait for the server to send data before giving up, as a float, 
+        :param timeout: (optional) How long in seconds to wait for the server to send data before giving up, as a float, 
             or a (`connect timeout, read timeout <user/advanced.html#timeouts>`_) tuple.
         :type timeout: float or tuple
         :param allow_redirects: (optional) Set to True by default.
@@ -114,7 +114,7 @@ class HttpSession(requests.Session):
         response = self._send_request_safe_mode(method, url, **kwargs)
         
         # record the consumed time
-        request_meta["response_time"] = int((time.time() - request_meta["start_time"]) * 1000)
+        request_meta["response_time"] = (time.time() - request_meta["start_time"]) * 1000
         
     
         request_meta["name"] = name or (response.history and response.history[0] or response).request.path_url
@@ -130,6 +130,12 @@ class HttpSession(requests.Session):
             response.locust_request_meta = request_meta
             return ResponseContextManager(response)
         else:
+            if name:
+                # Since we use the Exception message when grouping failures, in order to not get 
+                # multiple failure entries for different URLs for the same name argument, we need 
+                # to temporarily override the reponse.url attribute
+                orig_url = response.url
+                response.url = name
             try:
                 response.raise_for_status()
             except RequestException as e:
@@ -137,6 +143,7 @@ class HttpSession(requests.Session):
                     request_type=request_meta["method"], 
                     name=request_meta["name"], 
                     response_time=request_meta["response_time"], 
+                    response_length=request_meta["content_size"],
                     exception=e, 
                 )
             else:
@@ -146,6 +153,8 @@ class HttpSession(requests.Session):
                     response_time=request_meta["response_time"],
                     response_length=request_meta["content_size"],
                 )
+            if name:
+                response.url = orig_url
             return response
     
     def _send_request_safe_mode(self, method, url, **kwargs):
@@ -243,6 +252,7 @@ class ResponseContextManager(LocustResponse):
             request_type=self.locust_request_meta["method"],
             name=self.locust_request_meta["name"],
             response_time=self.locust_request_meta["response_time"],
+            response_length=self.locust_request_meta["content_size"],
             exception=exc,
         )
         self._is_reported = True

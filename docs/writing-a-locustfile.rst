@@ -12,43 +12,65 @@ A locust class represents one user (or a swarming locust if you will). Locust wi
 instance of the locust class for each user that is being simulated. There are a few attributes that 
 a locust class should typically define. 
 
-The :py:attr:`task_set <locust.core.Locust.task_set>` attribute
----------------------------------------------------------------
+The *task_set* attribute
+------------------------
 
 The :py:attr:`task_set <locust.core.Locust.task_set>` attribute should point to a 
 :py:class:`TaskSet <locust.core.TaskSet>` class which defines the behaviour of the user and 
 is described in more detail below.
 
-The *min_wait* and *max_wait* attributes
-----------------------------------------
+The *wait_time* attribute
+-------------------------
 
-In addition to the task_set attribute, one usually wants to declare the *min_wait* and *max_wait* 
-attributes. These are the minimum and maximum time respectively, in milliseconds, that a simulated user will wait 
-between executing each task. *min_wait* and *max_wait* default to 1000, and therefore a locust will 
-always wait 1 second between each task if *min_wait* and *max_wait* are not declared.
+In addition to the *task_set* attribute, one should also declare a 
+:py:attr:`wait_time <locust.core.Locust.wait_time>` method. It's used to determine 
+for how long a simulated user will wait between executing tasks. Locust comes with a few built in 
+functions that return a few common wait_time methods.
+
+The most common one is :py:attr:`between <locust.wait_time.between>`. It's used to make the simulated
+users wait a random time between a min and max value after each task execution. Other built in 
+wait time functions are :py:attr:`constant <locust.wait_time.constant>` and 
+:py:attr:`constant_pacing <locust.wait_time.constant_pacing>`.
 
 With the following locustfile, each user would wait between 5 and 15 seconds between tasks:
 
 .. code-block:: python
 
-    from locust import Locust, TaskSet, task
+    from locust import Locust, TaskSet, task, between
     
     class MyTaskSet(TaskSet):
         @task
         def my_task(self):
             print("executing my_task")
     
+    class User(Locust):
+        task_set = MyTaskSet
+        wait_time = between(5, 15)
+
+The wait_time method should return a number of seconds (or fraction of a second) and can also 
+be declared on a TaskSet class, in which case it will only be used for that TaskSet.
+
+It's also possible to declare your own wait_time method directly on a Locust or TaskSet class. The 
+following locust class would start sleeping for one second and then one, two, three, etc.
+
+.. code-block:: python
+
     class MyLocust(Locust):
         task_set = MyTaskSet
-        min_wait = 5000
-        max_wait = 15000
+        last_wait_time = 0
+        
+        def wait_time(self):
+            self.last_wait_time += 1
+            return self.last_wait_time
+    
 
-The *min_wait* and *max_wait* attributes can also be overridden in a TaskSet class.
 
 The *weight* attribute
 ----------------------
 
-You can run two locusts from the same file like so:
+If more than one locust class exists in the file, and no locusts are specified on the command line,
+each new spawn will choose randomly from the existing locusts. Otherwise, you can specify which locusts
+to use from the same file like so:
 
 .. code-block:: console
 
@@ -71,10 +93,12 @@ classes. Say for example, web users are three times more likely than mobile user
 The *host* attribute
 --------------------
 
-The host attribute is a URL prefix (i.e. "https://google.com") to the host that is to be loaded. 
-Usually, this is specified on the command line, using the :code:`--host` option, when locust is started. 
+The host attribute is a URL prefix (i.e. "http://google.com") to the host that is to be loaded. 
+Usually, this is specified in Locust's web UI or on the command line, using the 
+:code:`--host` option, when locust is started. 
+
 If one declares a host attribute in the locust class, it will be used in the case when no :code:`--host` 
-is specified on the command line.
+is specified on the command line or in the web request.
 
 
 TaskSet class
@@ -90,9 +114,9 @@ and—if we were load-testing an auction website—could do stuff like "loading 
 
 When a load test is started, each instance of the spawned Locust classes will start executing their 
 TaskSet. What happens then is that each TaskSet will pick one of its tasks and call it. It will then 
-wait a number of milliseconds, chosen at random between the Locust class' *min_wait* and *max_wait* attributes 
-(unless min_wait/max_wait have been defined directly under the TaskSet, in which case it will use 
-its own values instead). Then it will again pick a new task to be called, wait again, and so on.
+wait a number of seconds, specified by the Locust class' *wait_time* method (unless a *wait_time* 
+method has been declared directly on the TaskSet, in which case it will use its own method instead). 
+Then it will again pick a new task to be called, wait again, and so on.
 
 Declaring tasks
 ---------------
@@ -119,10 +143,10 @@ the following example *task2* will be executed twice as much as *task1*:
 .. code-block:: python
     
     from locust import Locust, TaskSet, task
+    from locust.wait_time import between
     
     class MyTaskSet(TaskSet):
-        min_wait = 5000
-        max_wait = 15000
+        wait_time = between(5, 15)
         
         @task(3)
         def task1(self):
@@ -255,6 +279,31 @@ its Locust instance, and the attribute :py:attr:`parent <locust.core.TaskSet.par
 parent TaskSet (it will point to the Locust instance, in the base TaskSet).
 
 
+TaskSequence class
+==================
+
+TaskSequence class is a TaskSet but its tasks will be executed in order.
+To define this order you should do the following:
+
+.. code-block:: python
+
+    class MyTaskSequence(TaskSequence):
+        @seq_task(1)
+        def first_task(self):
+            pass
+
+        @seq_task(2)
+        def second_task(self):
+            pass
+
+        @seq_task(3)
+        @task(10)
+        def third_task(self):
+            pass
+
+In the above example, the order is defined to execute first_task, then second_task and lastly the third_task for 10 times.
+As you can see, you can compose :py:meth:`@seq_task <locust.core.seq_task>` with :py:meth:`@task <locust.core.task>` decorator, and of course you can also nest TaskSets within TaskSequences and vice versa.
+
 Setups, Teardowns, on_start, and on_stop
 ========================================
 
@@ -295,7 +344,7 @@ Since many setup and cleanup operations are dependent on each other, here is the
 In general, the setup and teardown methods should be complementary.
 
 
-Making HTTP requests 
+Making HTTP requests
 =====================
 
 So far, we've only covered the task scheduling part of a Locust user. In order to actually load test 
@@ -314,7 +363,7 @@ with two URLs; **/** and **/about/**:
 
 .. code-block:: python
 
-    from locust import HttpLocust, TaskSet, task
+    from locust import HttpLocust, TaskSet, task, between
     
     class MyTaskSet(TaskSet):
         @task(2)
@@ -327,8 +376,7 @@ with two URLs; **/** and **/about/**:
     
     class MyLocust(HttpLocust):
         task_set = MyTaskSet
-        min_wait = 5000
-        max_wait = 15000
+        wait_time = between(5, 15)
 
 Using the above Locust class, each simulated user will wait between 5 and 15 seconds 
 between the requests, and **/** will be requested twice as much as **/about/**.
@@ -378,10 +426,12 @@ Response object. The request will be reported as a failure in Locust's statistic
 Response's *content* attribute will be set to None, and its *status_code* will be 0.
 
 
+.. _catch-response:
+
 Manually controlling if a request should be considered successful or a failure
 ------------------------------------------------------------------------------
 
-By default, requests are marked as failed requests unless the HTTP response code is OK (2xx). 
+By default, requests are marked as failed requests unless the HTTP response code is OK (<400). 
 Most of the time, this default is what you want. Sometimes however—for example when testing 
 a URL endpoint that you expect to return 404, or testing a badly designed system that might 
 return *200 OK* even though an error occurred—there's a need for manually controlling if 
@@ -392,7 +442,7 @@ One can mark requests as failed, even when the response code is OK, by using the
 
 .. code-block:: python
 
-    with client.get("/", catch_response=True) as response:
+    with self.client.get("/", catch_response=True) as response:
         if response.content != b"Success":
             response.failure("Got wrong response")
 
@@ -402,7 +452,7 @@ be reported as a success in the statistics:
 
 .. code-block:: python
 
-    with client.get("/does_not_exist/", catch_response=True) as response:
+    with self.client.get("/does_not_exist/", catch_response=True) as response:
         if response.status_code == 404:
             response.success()
 
@@ -421,7 +471,7 @@ Example:
 
     # Statistics for these requests will be grouped under: /blog/?id=[id]
     for i in range(10):
-        client.get("/blog?id=%i" % i, name="/blog?id=[id]")
+        self.client.get("/blog?id=%i" % i, name="/blog?id=[id]")
 
 Common libraries
 =================
